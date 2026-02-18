@@ -1,20 +1,44 @@
 # 🤖 Futures Signal Bot — Binance CCXT
 
-Bot trading signal otomatis untuk Binance Futures dengan analisis teknikal lengkap dan notifikasi Telegram.
+Bot trading signal otomatis untuk Binance Futures dengan analisis teknikal lengkap, watchlist custom, win rate tracker, dan alert TP/SL real-time via Telegram.
 
 ---
 
-## 📊 Analisis yang Digunakan
+## 📁 Struktur File
+
+```
+trading_bot/
+├── bot.py              # Main bot, command handler, auto scan loop
+├── analyzer.py         # Engine analisis teknikal & S&D zone
+├── config.py           # Konfigurasi parameter + watchlist manager
+├── tracker.py          # Win rate tracker & signal storage
+├── monitor.py          # Real-time TP/SL price monitor
+├── requirements.txt    # Dependencies
+├── .env                # Token & API key (buat sendiri dari .env.example)
+├── watchlist.json      # Auto-generated saat /addwatch digunakan
+└── signals_tracker.json # Auto-generated saat signal pertama masuk
+```
+
+---
+
+## 📊 Analisis Teknikal
 
 | Kategori | Indikator |
 |---|---|
-| **Trend** | EMA 8/21/50/200, Supertrend |
-| **Momentum** | RSI, MACD, Stochastic RSI |
-| **Volume** | Volume Avg, OBV, VWAP |
-| **Volatilitas** | ATR, Bollinger Bands |
-| **S/R Level** | Pivot Points, Swing High/Low |
-| **S&D Zone** | DBD, DBR, RBD, RBR detection |
+| **Trend** | EMA 8 / 21 / 50 / 200, Supertrend (10, 3) |
+| **Momentum** | RSI (14), MACD (12/26/9), Stochastic RSI |
+| **Volume** | Volume Avg (20), OBV, VWAP |
+| **Volatilitas** | ATR (14), Bollinger Bands (20, 2) |
+| **S/R Level** | Pivot Points (Daily) |
+| **S&D Zone** | DBD, DBR, RBD, RBR — auto detection |
 | **Pattern** | Engulfing, Pin Bar, Hammer, Shooting Star |
+
+### Multi-Timeframe
+| Timeframe | Fungsi |
+|---|---|
+| `4H` | Bias market & S&D zone detection |
+| `1H` | Konfirmasi trend & Supertrend |
+| `15m` | Entry signal & scoring |
 
 ### Scoring System (0–13 poin)
 | Kondisi | Poin |
@@ -31,32 +55,81 @@ Bot trading signal otomatis untuk Binance Futures dengan analisis teknikal lengk
 | S&D Zone (4H) | +3 |
 | Fresh Zone (bonus) | +1 |
 
-**Signal dikirim jika score ≥ 6**
+> Signal dikirim jika **score ≥ 6**
+
+---
+
+## 📖 Daftar Command Telegram
+
+| Command | Fungsi |
+|---|---|
+| `/scan` | Scan semua pair otomatis (top 50 by volume) |
+| `/scan BTC` | Scan BTC/USDT saja |
+| `/scan BTC ETH SOL` | Scan beberapa pair sekaligus |
+| `/watchlist` | Lihat daftar watchlist |
+| `/addwatch BTC` | Tambah BTC/USDT ke watchlist |
+| `/delwatch BTC` | Hapus BTC/USDT dari watchlist |
+| `/stats` | Win rate & statistik semua signal |
+| `/open` | Lihat semua signal yang masih open |
+| `/help` | Daftar semua perintah |
+
+---
+
+## 🔔 Fitur Utama
+
+### 1. Auto Scan (Setiap 15 Menit)
+Bot otomatis scan setiap candle 15m tutup. Jika ada watchlist, pair dalam watchlist **selalu discan** bersamaan dengan top pair by volume.
+
+### 2. Watchlist Custom
+```
+/addwatch BTC ETH SOL    → tambah 3 pair sekaligus
+/delwatch BTC            → hapus dari watchlist
+/watchlist               → lihat isi watchlist
+```
+Watchlist disimpan di `watchlist.json` — **tidak hilang saat bot restart.**
+
+### 3. Win Rate Tracker
+Setiap signal yang dikirim otomatis dicatat di `signals_tracker.json`. Status diupdate otomatis saat TP/SL tersentuh.
+```
+/stats  →  Win Rate: 68.5%  ███████░
+           Total Signal: 42
+           TP1 Hit: 15  |  TP2 Hit: 9  |  TP3 Hit: 5
+           SL Hit: 13   |  Open: 5
+```
+
+### 4. Real-Time TP/SL Alert
+Monitor cek harga setiap **30 detik**. Notif dikirim otomatis saat TP1/TP2/TP3 atau SL tersentuh, lengkap dengan PnL.
+
+### 5. Anti-Duplikat
+Signal yang sama (symbol + direction) tidak akan dikirim ulang dalam **60 menit**.
 
 ---
 
 ## ⚙️ Setup
 
-### 1. Clone & Install Dependencies
+### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Setup Environment Variables
+### 2. Buat File .env
 ```bash
 cp .env.example .env
-# Edit .env dengan token dan chat ID kamu
+```
+Isi `.env`:
+```env
+TELEGRAM_TOKEN=1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ
+TELEGRAM_CHAT_ID=-1001234567890
+BINANCE_API_KEY=
+BINANCE_SECRET=
 ```
 
-### 3. Dapatkan Telegram Bot Token
-- Buka [@BotFather](https://t.me/BotFather) di Telegram
-- Ketik `/newbot` dan ikuti instruksi
-- Copy token ke `.env`
+### 3. Dapatkan Telegram Token
+- Buka [@BotFather](https://t.me/BotFather) → `/newbot` → copy token
 
 ### 4. Dapatkan Chat ID
-- Untuk channel: forward pesan dari channel ke [@userinfobot](https://t.me/userinfobot)
-- Untuk grup: tambahkan bot ke grup, lalu cek dengan `/getid`
-- Untuk DM pribadi: buka [@userinfobot](https://t.me/userinfobot)
+- **Channel/Grup:** Forward pesan ke [@userinfobot](https://t.me/userinfobot)
+- **DM Pribadi:** Buka [@userinfobot](https://t.me/userinfobot) langsung
 
 ### 5. Jalankan Bot
 ```bash
@@ -65,34 +138,23 @@ python bot.py
 
 ---
 
-## 📁 Struktur File
-
-```
-trading_bot/
-├── bot.py          # Main bot & Telegram formatter
-├── analyzer.py     # Analisis teknikal & signal engine
-├── config.py       # Konfigurasi semua parameter
-├── requirements.txt
-├── .env.example
-└── README.md
-```
-
----
-
 ## ⚙️ Kustomisasi (config.py)
 
 ```python
-MIN_SCORE = 6         # Naikkan ke 8-9 untuk signal lebih selektif
-MIN_VOLUME_USDT = 50_000_000  # Filter volume minimum
-MAX_PAIRS = 50        # Jumlah pair yang di-scan
-LEVERAGE = 10         # Leverage default yang ditampilkan
-TF_SIGNAL = "15m"     # Timeframe entry
-SL_ATR_MULT = 1.5     # Stop loss = 1.5x ATR
+MIN_SCORE        = 6      # Naikkan ke 8-9 untuk signal lebih selektif
+MIN_VOLUME_USDT  = 50_000_000  # Min volume 24h ($)
+MAX_PAIRS        = 50     # Max pair yang di-scan per cycle
+LEVERAGE         = 10     # Leverage yang ditampilkan di signal
+TF_SIGNAL        = "15m"  # Timeframe entry
+SL_ATR_MULT      = 1.5    # Stop loss = 1.5x ATR
+TP1_RR           = 1.5    # Risk/Reward TP1
+TP2_RR           = 2.5    # Risk/Reward TP2
+TP3_RR           = 4.0    # Risk/Reward TP3
 ```
 
 ---
 
-## 📈 Contoh Output Telegram
+## 📈 Contoh Output Signal
 
 ```
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -100,7 +162,7 @@ SL_ATR_MULT = 1.5     # Stop loss = 1.5x ATR
 ┃  ⚡ Strength: 💪 STRONG  ███████░
 ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ┃  💰 Entry:    43250.5000
-┃  🛑 Stop:     42800.0000  (-1.0%)
+┃  🛑 Stop Loss: 42800.0000  (-1.0%)
 ┃  🎯 TP1:      43925.0000  (+15.2%)
 ┃  🎯 TP2:      44600.0000  (+25.3%)
 ┃  🎯 TP3:      46000.0000  (+64.1%)
@@ -119,6 +181,20 @@ SL_ATR_MULT = 1.5     # Stop loss = 1.5x ATR
 ┃    ✨ Fresh Zone
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🕐 2024-01-15 08:15 UTC  ·  Score: 10/13
+```
+
+## 📈 Contoh Output TP/SL Alert
+
+```
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+┃  🎯 TP2 HIT  ·  ✅ WIN
+┃  🟢 BTC/USDT  ·  LONG
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+┃  📥 Entry:  43250.5000
+┃  🏁 Close:  44598.2000
+┃  💰 PnL:    +31.2%  (10x)
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🕐 2024-01-15 10:45 UTC
 ```
 
 ---
